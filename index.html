@@ -3,309 +3,138 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>점핑다이어트 영상 모음</title>
+<title>점핑다이어트</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Noto Sans KR', sans-serif; background: #f2f2f2; }
-.app { max-width: 480px; margin: 0 auto; background: #f2f2f2; min-height: 100vh; }
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background: #f2f2f2;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 20px;
+}
 
-.header { background: #FF0000; padding: 16px 18px 14px; display: flex; align-items: center; gap: 12px; }
-.header-icon { width: 36px; height: 24px; background: white; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.play-tri { width: 0; height: 0; border-top: 7px solid transparent; border-bottom: 7px solid transparent; border-left: 12px solid #FF0000; margin-left: 3px; }
-.header-text h1 { color: white; font-size: 19px; font-weight: 700; }
-.header-text p { color: rgba(255,255,255,0.85); font-size: 12px; margin-top: 2px; }
+h1 {
+  font-size: 32px;
+  font-weight: 900;
+  color: #222;
+  margin-bottom: 8px;
+  text-align: center;
+}
+p {
+  font-size: 16px;
+  color: #888;
+  margin-bottom: 40px;
+  text-align: center;
+}
 
-.filter-bar { background: white; border-bottom: 1px solid #e8e8e8; padding: 10px 14px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
-.filter-bar::-webkit-scrollbar { display: none; }
-.filter-btn { border: 1.5px solid #ddd; background: white; color: #555; border-radius: 20px; padding: 5px 14px; font-size: 13px; font-family: 'Noto Sans KR', sans-serif; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; font-weight: 500; }
-.filter-btn.active { background: #FF0000; border-color: #FF0000; color: white; }
+.main-btn {
+  width: 100%;
+  max-width: 420px;
+  background: #FF0000;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 28px 20px;
+  font-size: 26px;
+  font-weight: 900;
+  font-family: 'Noto Sans KR', sans-serif;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 24px;
+  box-shadow: 0 6px 24px rgba(255,0,0,0.25);
+  letter-spacing: -0.5px;
+}
 
-.action-bar { display: flex; gap: 8px; padding: 12px 12px 4px; }
-.more-btn { flex: 1; background: #FF0000; color: white; border: none; border-radius: 10px; padding: 11px; font-size: 14px; font-weight: 700; font-family: 'Noto Sans KR', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; transition: all 0.15s; }
-.more-btn:hover { background: #cc0000; }
-.more-btn:disabled { background: #ffaaaa; cursor: not-allowed; }
-.reload-btn { background: white; color: #333; border: 1.5px solid #ddd; border-radius: 10px; padding: 11px 14px; font-size: 13px; font-family: 'Noto Sans KR', sans-serif; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 500; transition: all 0.15s; }
-.reload-btn:hover { border-color: #FF0000; color: #FF0000; }
-.reload-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.section-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #555;
+  margin-bottom: 14px;
+  text-align: center;
+}
 
-.progress-bar { height: 3px; background: #eee; margin: 6px 12px 0; border-radius: 2px; overflow: hidden; display: none; }
-.progress-fill { height: 100%; background: #FF0000; border-radius: 2px; transition: width 0.3s; width: 0%; }
+.time-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  width: 100%;
+  max-width: 420px;
+}
 
-.count-bar { padding: 8px 14px 2px; font-size: 12px; color: #999; }
-
-.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 6px 12px 24px; }
-.card { background: white; border-radius: 12px; overflow: hidden; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-.card:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,0.13); }
-.card:active { transform: scale(0.97); }
-.thumb { width: 100%; aspect-ratio: 16/9; background: #ddd; position: relative; overflow: hidden; }
-.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.duration-badge { position: absolute; bottom: 5px; right: 5px; background: rgba(0,0,0,0.82); color: white; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 500; }
-.play-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; background: rgba(0,0,0,0.2); transition: opacity 0.15s; }
-.card:hover .play-overlay { opacity: 1; }
-.play-circle { width: 38px; height: 38px; background: rgba(255,255,255,0.93); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-.play-arrow { width: 0; height: 0; border-top: 7px solid transparent; border-bottom: 7px solid transparent; border-left: 13px solid #FF0000; margin-left: 3px; }
-.card-body { padding: 9px 10px 11px; }
-.card-title { font-size: 12.5px; font-weight: 500; color: #222; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.card-meta { font-size: 11px; color: #aaa; margin-top: 4px; }
-
-.loading { text-align: center; padding: 60px 20px; color: #aaa; font-size: 14px; }
-.spinner { width: 30px; height: 30px; border: 3px solid #eee; border-top-color: #FF0000; border-radius: 50%; animation: spin 0.75s linear infinite; margin: 0 auto 14px; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.error-box { margin: 20px 14px; background: white; border-radius: 12px; padding: 24px 20px; text-align: center; font-size: 13px; color: #666; line-height: 1.8; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
-.error-emoji { font-size: 32px; margin-bottom: 10px; }
-.error-msg { color: #bbb; font-size: 11px; margin-top: 6px; }
-.retry-btn { margin-top: 16px; background: #FF0000; color: white; border: none; border-radius: 8px; padding: 10px 24px; font-size: 13px; font-family: 'Noto Sans KR', sans-serif; font-weight: 600; cursor: pointer; }
-.empty { text-align: center; padding: 50px 20px; color: #bbb; font-size: 13px; grid-column: 1/-1; line-height: 1.8; }
+.time-btn {
+  background: white;
+  border: 2px solid #eee;
+  border-radius: 16px;
+  padding: 22px 10px;
+  font-size: 20px;
+  font-weight: 700;
+  font-family: 'Noto Sans KR', sans-serif;
+  cursor: pointer;
+  color: #333;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.time-btn span.label {
+  font-size: 13px;
+  font-weight: 400;
+  color: #aaa;
+}
 </style>
 </head>
 <body>
-<div class="app">
-  <div class="header">
-    <div class="header-icon"><div class="play-tri"></div></div>
-    <div class="header-text">
-      <h1>점핑다이어트</h1>
-      <p id="subtitle">영상 불러오는 중...</p>
-    </div>
-  </div>
 
-  <div class="filter-bar">
-    <button class="filter-btn active" onclick="setFilter('all')">전체</button>
-    <button class="filter-btn" onclick="setFilter('10-20')">10~20분</button>
-    <button class="filter-btn" onclick="setFilter('20-30')">20~30분</button>
-    <button class="filter-btn" onclick="setFilter('30-40')">30~40분</button>
-    <button class="filter-btn" onclick="setFilter('40+')">40분+</button>
-  </div>
+<h1>🏃 점핑다이어트</h1>
+<p>원하는 영상을 눌러보세요!</p>
 
-  <div class="action-bar">
-    <button class="more-btn" id="moreBtn" onclick="doLoadMore()">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="12" y1="8" x2="12" y2="16"/>
-        <line x1="8" y1="12" x2="16" y2="12"/>
-      </svg>
-      다른 영상 불러오기
-    </button>
-    <button class="reload-btn" id="reloadBtn" onclick="init()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-        <polyline points="23 4 23 10 17 10"/>
-        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-      </svg>
-      처음부터
-    </button>
-  </div>
+<button class="main-btn" onclick="open('전체')">
+  ▶ 점핑다이어트 영상 보기
+</button>
 
-  <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
-  <div class="count-bar" id="countBar"></div>
-  <div id="content">
-    <div class="loading"><div class="spinner"></div>점핑다이어트 영상 검색 중...</div>
-  </div>
+<div class="section-title">시간대별로 보기</div>
+
+<div class="time-grid">
+  <button class="time-btn" onclick="open('10분')">
+    ⏱ 10분
+    <span class="label">가볍게</span>
+  </button>
+  <button class="time-btn" onclick="open('20분')">
+    ⏱ 20분
+    <span class="label">적당히</span>
+  </button>
+  <button class="time-btn" onclick="open('30분')">
+    ⏱ 30분
+    <span class="label">열심히</span>
+  </button>
+  <button class="time-btn" onclick="open('40분')">
+    ⏱ 40분+
+    <span class="label">빡세게</span>
+  </button>
 </div>
 
 <script>
-const API_KEY = 'AIzaSyA-Wi7g_K24NWqqlAC-TjrbewPoto2CoBM';
-const KEYWORD = '점핑다이어트 영상';
-const JUMPING_KW = ['점핑', '트램폴린', 'jumping', 'trampoline'];
-
-const FILTERS = {
-  'all':   { min: 0,  max: null },
-  '10-20': { min: 10, max: 20 },
-  '20-30': { min: 20, max: 30 },
-  '30-40': { min: 30, max: 40 },
-  '40+':   { min: 40, max: null },
-};
-const FILTER_KEYS = ['all','10-20','20-30','30-40','40+'];
-const FILTER_LABELS = { 'all':'전체', '10-20':'10~20분', '20-30':'20~30분', '30-40':'30~40분', '40+':'40분+' };
-
-let allVideos = [];
-let displayedVideos = [];
-let seenIds = new Set();
-let currentFilter = 'all';
-let nextPageToken = null;
-
-function isoToMins(iso) {
-  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if (!m) return 0;
-  return (parseInt(m[1]||0)*60) + parseInt(m[2]||0);
+function open(type) {
+  const queries = {
+    '전체': '점핑 다이어트 영상',
+    '10분': '점핑 다이어트 10분',
+    '20분': '점핑 다이어트 20분',
+    '30분': '점핑 다이어트 30분',
+    '40분': '점핑 다이어트 40분',
+  };
+  const q = encodeURIComponent(queries[type]);
+  window.location.href = `https://www.youtube.com/results?search_query=${q}`;
 }
-
-function isoToStr(iso) {
-  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if (!m) return '0:00';
-  const h = parseInt(m[1]||0), mn = parseInt(m[2]||0), s = parseInt(m[3]||0);
-  if (h > 0) return `${h}:${String(mn).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  return `${mn}:${String(s).padStart(2,'0')}`;
-}
-
-function isJumping(item) {
-  const title = (item.snippet.title || '').toLowerCase();
-  const desc = (item.snippet.description || '').toLowerCase();
-  return JUMPING_KW.some(kw => title.includes(kw) || desc.includes(kw));
-}
-
-function applyFilter(videos) {
-  const { min, max } = FILTERS[currentFilter];
-  return videos.filter(v => v.mins >= min && (max === null || v.mins < max));
-}
-
-function setFilter(val) {
-  currentFilter = val;
-  document.querySelectorAll('.filter-btn').forEach((b, i) => {
-    b.classList.toggle('active', FILTER_KEYS[i] === val);
-  });
-  renderGrid();
-}
-
-function renderGrid() {
-  const filtered = applyFilter(displayedVideos);
-  const label = FILTER_LABELS[currentFilter];
-  document.getElementById('subtitle').textContent = `${label} 영상 ${filtered.length}개 · 눌러서 시청`;
-  document.getElementById('countBar').textContent = `누적 ${allVideos.length}개 불러옴 · ${label} ${filtered.length}개 표시`;
-
-  if (filtered.length === 0) {
-    document.getElementById('content').innerHTML = `
-      <div class="grid"><div class="empty">
-        이 구간 영상이 아직 없어요 😅<br>
-        <small>다른 영상 불러오기를 눌러 더 불러와보세요!</small>
-      </div></div>`;
-    return;
-  }
-
-  const html = filtered.map(v => `
-    <div class="card" onclick="window.open('https://www.youtube.com/watch?v=${v.id}','_blank')">
-      <div class="thumb">
-        <img src="https://img.youtube.com/vi/${v.id}/mqdefault.jpg" loading="lazy" alt="">
-        <div class="duration-badge">${v.durStr}</div>
-        <div class="play-overlay"><div class="play-circle"><div class="play-arrow"></div></div></div>
-      </div>
-      <div class="card-body">
-        <div class="card-title">${v.title}</div>
-        <div class="card-meta">${v.channel} · ${v.mins}분</div>
-      </div>
-    </div>
-  `).join('');
-
-  document.getElementById('content').innerHTML = `<div class="grid">${html}</div>`;
-}
-
-function setBusy(msg, progress) {
-  document.getElementById('moreBtn').disabled = true;
-  document.getElementById('reloadBtn').disabled = true;
-  document.getElementById('subtitle').textContent = msg;
-  document.getElementById('progressBar').style.display = 'block';
-  document.getElementById('progressFill').style.width = progress + '%';
-}
-
-function setReady() {
-  document.getElementById('moreBtn').disabled = false;
-  document.getElementById('reloadBtn').disabled = false;
-  document.getElementById('progressBar').style.display = 'none';
-  document.getElementById('progressFill').style.width = '0%';
-}
-
-function showError(msg) {
-  document.getElementById('subtitle').textContent = '불러오기 실패';
-  document.getElementById('countBar').textContent = '';
-  document.getElementById('content').innerHTML = `
-    <div class="error-box">
-      <div class="error-emoji">😢</div>
-      <div>영상을 불러오지 못했어요.</div>
-      <div class="error-msg">${msg}</div>
-      <button class="retry-btn" onclick="init()">다시 시도</button>
-    </div>`;
-  setReady();
-}
-
-async function fetchDetails(ids) {
-  if (ids.length === 0) return [];
-  const res = await fetch(
-    'https://www.googleapis.com/youtube/v3/videos' +
-    '?part=contentDetails,snippet' +
-    '&id=' + ids.join(',') +
-    '&key=' + API_KEY
-  );
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return (data.items || []).map(v => {
-    const iso = v.contentDetails.duration;
-    const mins = isoToMins(iso);
-    if (mins < 5) return null;
-    return { id: v.id, title: v.snippet.title, channel: v.snippet.channelTitle, mins, durStr: isoToStr(iso) };
-  }).filter(Boolean);
-}
-
-async function loadNextBatch(msg) {
-  setBusy(msg, 20);
-
-  const tokenParam = nextPageToken ? `&pageToken=${nextPageToken}` : '';
-  const url =
-    'https://www.googleapis.com/youtube/v3/search' +
-    '?part=snippet' +
-    '&q=' + encodeURIComponent(KEYWORD) +
-    '&type=video' +
-    '&maxResults=50' +
-    '&relevanceLanguage=ko' +
-    '&regionCode=KR' +
-    '&key=' + API_KEY +
-    tokenParam;
-
-  setBusy(msg, 40);
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-
-  nextPageToken = data.nextPageToken || null;
-
-  setBusy(msg, 60);
-
-  // 점핑 관련 키워드 없는 영상 필터링
-  const ids = (data.items || [])
-    .filter(isJumping)
-    .map(i => i.id.videoId)
-    .filter(id => !seenIds.has(id));
-  ids.forEach(id => seenIds.add(id));
-
-  const chunks = [];
-  for (let i = 0; i < ids.length; i += 50) chunks.push(ids.slice(i, i+50));
-  const newVideos = (await Promise.all(chunks.map(c => fetchDetails(c).catch(() => [])))).flat();
-
-  allVideos = [...allVideos, ...newVideos];
-  displayedVideos = newVideos; // 화면은 이번 배치만 표시
-
-  setBusy(msg, 90);
-}
-
-async function init() {
-  allVideos = [];
-  displayedVideos = [];
-  seenIds = new Set();
-  nextPageToken = null;
-
-  document.getElementById('content').innerHTML = '<div class="loading"><div class="spinner"></div>점핑다이어트 영상 검색 중...</div>';
-  document.getElementById('countBar').textContent = '';
-
-  try {
-    await loadNextBatch('영상 검색 중...');
-    setReady();
-    renderGrid();
-  } catch(e) {
-    showError(e.message);
-  }
-}
-
-async function doLoadMore() {
-  try {
-    await loadNextBatch('다음 영상 불러오는 중...');
-    setReady();
-    renderGrid();
-  } catch(e) {
-    showError(e.message);
-    setReady();
-  }
-}
-
-init();
 </script>
+
 </body>
 </html>
