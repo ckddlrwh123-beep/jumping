@@ -105,15 +105,7 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #f2f2f2; }
 
 <script>
 const API_KEY = 'AIzaSyA-Wi7g_K24NWqqlAC-TjrbewPoto2CoBM';
-
-const KEYWORDS = [
-  '점핑다이어트 영상',
-  '점핑다이어트',
-  '점핑 다이어트',
-  '점핑 유산소',
-  '점핑 홈트',
-  '점핑피트니스',
-];
+const KEYWORD = '점핑다이어트 영상';
 
 const FILTERS = {
   'all':   { min: 0,  max: null },
@@ -129,8 +121,7 @@ let allVideos = [];
 let displayedVideos = [];
 let seenIds = new Set();
 let currentFilter = 'all';
-let pageTokens = {};
-let kwQueue = [];
+let nextPageToken = null;
 
 function isoToMins(iso) {
   const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
@@ -219,36 +210,6 @@ function showError(msg) {
   setReady();
 }
 
-function pickNextKeyword() {
-  for (const kw of KEYWORDS) {
-    if (pageTokens[kw] === undefined) return kw;
-  }
-  for (const kw of kwQueue) {
-    if (pageTokens[kw] && pageTokens[kw] !== 'DONE') return kw;
-  }
-  return null;
-}
-
-async function searchNextPage(kw) {
-  const token = pageTokens[kw];
-  const tokenParam = (token && token !== 'DONE') ? `&pageToken=${token}` : '';
-  const url =
-    'https://www.googleapis.com/youtube/v3/search' +
-    '?part=snippet' +
-    '&q=' + encodeURIComponent(kw) +
-    '&type=video' +
-    '&maxResults=50' +
-    '&relevanceLanguage=ko' +
-    '&regionCode=KR' +
-    '&key=' + API_KEY +
-    tokenParam;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  pageTokens[kw] = data.nextPageToken || 'DONE';
-  return (data.items || []).map(i => i.id.videoId).filter(Boolean);
-}
-
 async function fetchDetails(ids) {
   if (ids.length === 0) return [];
   const res = await fetch(
@@ -267,60 +228,53 @@ async function fetchDetails(ids) {
   }).filter(Boolean);
 }
 
-async function loadNextBatch(numKw, msg) {
+async function loadNextBatch(msg) {
   setBusy(msg, 20);
 
-  const kwsToUse = [];
-  const seen = new Set();
-  for (let i = 0; i < numKw * 3 && kwsToUse.length < numKw; i++) {
-    const kw = pickNextKeyword();
-    if (!kw || seen.has(kw)) break;
-    seen.add(kw);
-    kwsToUse.push(kw);
-    const qi = kwQueue.indexOf(kw);
-    if (qi !== -1) { kwQueue.splice(qi, 1); kwQueue.push(kw); }
-    else kwQueue.push(kw);
-  }
-
-  if (kwsToUse.length === 0) {
-    Object.keys(pageTokens).forEach(k => delete pageTokens[k]);
-    kwQueue = [...KEYWORDS];
-    kwsToUse.push(KEYWORDS[0]);
-  }
+  const tokenParam = nextPageToken ? `&pageToken=${nextPageToken}` : '';
+  const url =
+    'https://www.googleapis.com/youtube/v3/search' +
+    '?part=snippet' +
+    '&q=' + encodeURIComponent(KEYWORD) +
+    '&type=video' +
+    '&maxResults=50' +
+    '&relevanceLanguage=ko' +
+    '&regionCode=KR' +
+    '&key=' + API_KEY +
+    tokenParam;
 
   setBusy(msg, 40);
-  const idArrays = await Promise.all(kwsToUse.map(kw => searchNextPage(kw).catch(() => [])));
-  setBusy(msg, 65);
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
 
-  const newIds = [...new Set(idArrays.flat())].filter(id => !seenIds.has(id));
-  newIds.forEach(id => seenIds.add(id));
+  nextPageToken = data.nextPageToken || null;
 
-  if (newIds.length === 0) return 0;
+  setBusy(msg, 60);
+  const ids = (data.items || []).map(i => i.id.videoId).filter(id => !seenIds.has(id));
+  ids.forEach(id => seenIds.add(id));
 
   const chunks = [];
-  for (let i = 0; i < newIds.length; i += 50) chunks.push(newIds.slice(i, i+50));
-  const detailArrays = await Promise.all(chunks.map(c => fetchDetails(c).catch(() => [])));
-  const newVideos = detailArrays.flat();
+  for (let i = 0; i < ids.length; i += 50) chunks.push(ids.slice(i, i+50));
+  const newVideos = (await Promise.all(chunks.map(c => fetchDetails(c).catch(() => [])))).flat();
 
   allVideos = [...allVideos, ...newVideos];
-  displayedVideos = [...displayedVideos, ...newVideos];
+  displayedVideos = newVideos; // ← 화면은 이번 배치만 표시
 
   setBusy(msg, 90);
-  return newVideos.length;
 }
 
 async function init() {
   allVideos = [];
   displayedVideos = [];
   seenIds = new Set();
-  pageTokens = {};
-  kwQueue = [...KEYWORDS];
+  nextPageToken = null;
 
   document.getElementById('content').innerHTML = '<div class="loading"><div class="spinner"></div>점핑다이어트 영상 검색 중...</div>';
   document.getElementById('countBar').textContent = '';
 
   try {
-    await loadNextBatch(2, '영상 검색 중...');
+    await loadNextBatch('영상 검색 중...');
     setReady();
     renderGrid();
   } catch(e) {
@@ -330,15 +284,9 @@ async function init() {
 
 async function doLoadMore() {
   try {
-    // 핵심: 화면에 표시되는 목록만 초기화 (seenIds는 유지해서 중복 방지)
-    displayedVideos = [];
-    
-    const count = await loadNextBatch(2, `다음 영상 불러오는 중... (현재 누적 ${allVideos.length}개)`);
+    await loadNextBatch('다음 영상 불러오는 중...');
     setReady();
     renderGrid();
-    if (count === 0) {
-      document.getElementById('countBar').textContent += ' · 더 이상 새 영상이 없어 처음부터 다시 불러옵니다';
-    }
   } catch(e) {
     showError(e.message);
     setReady();
