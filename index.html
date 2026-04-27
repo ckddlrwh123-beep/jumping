@@ -330,6 +330,9 @@ async function init() {
 
 async function doLoadMore() {
   try {
+    // 핵심: 화면에 표시되는 목록만 초기화 (seenIds는 유지해서 중복 방지)
+    displayedVideos = [];
+    
     const count = await loadNextBatch(2, `다음 영상 불러오는 중... (현재 누적 ${allVideos.length}개)`);
     setReady();
     renderGrid();
