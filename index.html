@@ -29,6 +29,9 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #f2f2f2; }
 .reload-btn:hover { border-color: #FF0000; color: #FF0000; }
 .reload-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.progress-bar { height: 3px; background: #eee; margin: 6px 12px 0; border-radius: 2px; overflow: hidden; display: none; }
+.progress-fill { height: 100%; background: #FF0000; border-radius: 2px; transition: width 0.3s; width: 0%; }
+
 .count-bar { padding: 8px 14px 2px; font-size: 12px; color: #999; }
 
 .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 6px 12px 24px; }
@@ -54,7 +57,7 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #f2f2f2; }
 .error-emoji { font-size: 32px; margin-bottom: 10px; }
 .error-msg { color: #bbb; font-size: 11px; margin-top: 6px; }
 .retry-btn { margin-top: 16px; background: #FF0000; color: white; border: none; border-radius: 8px; padding: 10px 24px; font-size: 13px; font-family: 'Noto Sans KR', sans-serif; font-weight: 600; cursor: pointer; }
-.empty { text-align: center; padding: 50px 20px; color: #bbb; font-size: 13px; grid-column: 1/-1; }
+.empty { text-align: center; padding: 50px 20px; color: #bbb; font-size: 13px; grid-column: 1/-1; line-height: 1.8; }
 </style>
 </head>
 <body>
@@ -94,6 +97,7 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #f2f2f2; }
     </button>
   </div>
 
+  <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
   <div class="count-bar" id="countBar"></div>
   <div id="content">
     <div class="loading"><div class="spinner"></div>점핑다이어트 영상 검색 중...</div>
@@ -103,31 +107,40 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #f2f2f2; }
 <script>
 const API_KEY = 'AIzaSyA-Wi7g_K24NWqqlAC-TjrbewPoto2CoBM';
 
+// 키워드 최대한 다양하게
 const KEYWORDS = [
   '점핑다이어트',
+  '점핑 다이어트',
   '점핑다이어트 홈트',
-  '점핑 유산소 운동',
+  '점핑 유산소',
   '점핑다이어트 루틴',
   '점핑 다이어트 전신운동',
   '점핑다이어트 따라하기',
   '점핑피트니스',
-  '점핑 칼로리 소모',
+  '점핑다이어트 10분',
+  '점핑다이어트 20분',
+  '점핑다이어트 30분',
+  '점핑다이어트 40분',
+  '점핑 운동 초보',
+  '점핑 칼로리',
+  '점핑 유산소 운동 홈트',
 ];
 
-// 필터 정의: { min, max } (max=null이면 상한 없음)
+// 필터: min 이상 max 미만 (max=null이면 상한없음)
 const FILTERS = {
-  'all':   { min: 0,  max: null },
-  '10-20': { min: 10, max: 20 },
-  '20-30': { min: 20, max: 30 },
-  '30-40': { min: 30, max: 40 },
-  '40+':   { min: 40, max: null },
+  'all':   { min: 0,  max: null, label: '전체' },
+  '10-20': { min: 10, max: 20,   label: '10~20분' },
+  '20-30': { min: 20, max: 30,   label: '20~30분' },
+  '30-40': { min: 30, max: 40,   label: '30~40분' },
+  '40+':   { min: 40, max: null, label: '40분+' },
 };
 const FILTER_KEYS = ['all','10-20','20-30','30-40','40+'];
 
-let allVideos = [];
+let allVideos = [];       // 누적된 전체 영상 (중복 없음)
+let seenIds = new Set();  // 중복 체크
 let currentFilter = 'all';
-let usedKeywords = new Set();
-let pageTokenMap = {}; // keyword → pageToken
+let kwIndex = 0;          // 다음에 쓸 키워드 인덱스
+let pageTokenMap = {};    // 키워드별 다음 페이지 토큰
 
 function isoToMins(iso) {
   const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
@@ -138,9 +151,19 @@ function isoToMins(iso) {
 function isoToStr(iso) {
   const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!m) return '0:00';
-  const h = parseInt(m[1]||0), min = parseInt(m[2]||0), s = parseInt(m[3]||0);
-  if (h > 0) return `${h}:${String(min).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  return `${min}:${String(s).padStart(2,'0')}`;
+  const h = parseInt(m[1]||0), mn = parseInt(m[2]||0), s = parseInt(m[3]||0);
+  if (h > 0) return `${h}:${String(mn).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${mn}:${String(s).padStart(2,'0')}`;
+}
+
+// 필터 적용 (min 이상 max 미만 — 엄격하게)
+function applyFilter(videos) {
+  const { min, max } = FILTERS[currentFilter];
+  return videos.filter(v => {
+    if (v.mins < min) return false;
+    if (max !== null && v.mins >= max) return false;
+    return true;
+  });
 }
 
 function setFilter(val) {
@@ -151,23 +174,24 @@ function setFilter(val) {
   renderGrid();
 }
 
-function applyFilterToVideos(videos) {
-  const { min, max } = FILTERS[currentFilter];
-  return videos.filter(v => v.mins >= min && (max === null || v.mins < max));
-}
-
 function renderGrid() {
-  const filtered = applyFilterToVideos(allVideos);
-  const label = currentFilter === 'all' ? '전체' : currentFilter + '분';
+  const filtered = applyFilter(allVideos);
+  const { label } = FILTERS[currentFilter];
   document.getElementById('subtitle').textContent = `${label} 영상 ${filtered.length}개 · 눌러서 시청`;
-  document.getElementById('countBar').textContent = `총 ${filtered.length}개`;
+  document.getElementById('countBar').textContent = `누적 ${allVideos.length}개 중 ${filtered.length}개 표시`;
 
   if (filtered.length === 0) {
-    document.getElementById('content').innerHTML = '<div class="grid"><div class="empty">해당 구간 영상이 없어요 😅<br><small style="font-size:11px;margin-top:6px;display:block;">랜덤 섞기로 새 영상을 불러와보세요!</small></div></div>';
+    document.getElementById('content').innerHTML = `
+      <div class="grid"><div class="empty">
+        이 구간 영상이 아직 없어요 😅<br>
+        <small>랜덤 섞기를 눌러 더 불러와보세요!</small>
+      </div></div>`;
     return;
   }
 
-  const html = filtered.map(v => `
+  // 랜덤 순서로 표시
+  const shuffled = [...filtered].sort(() => Math.random() - 0.5);
+  const html = shuffled.map(v => `
     <div class="card" onclick="window.open('https://www.youtube.com/watch?v=${v.id}','_blank')">
       <div class="thumb">
         <img src="https://img.youtube.com/vi/${v.id}/mqdefault.jpg" loading="lazy" alt="">
@@ -183,17 +207,19 @@ function renderGrid() {
   document.getElementById('content').innerHTML = `<div class="grid">${html}</div>`;
 }
 
-function setLoadingState(msg) {
-  document.getElementById('content').innerHTML = `<div class="loading"><div class="spinner"></div>${msg}</div>`;
-  document.getElementById('subtitle').textContent = '검색 중...';
-  document.getElementById('countBar').textContent = '';
+function setBusy(msg, progress) {
   document.getElementById('shuffleBtn').disabled = true;
   document.getElementById('reloadBtn').disabled = true;
+  document.getElementById('subtitle').textContent = msg;
+  document.getElementById('progressBar').style.display = 'block';
+  document.getElementById('progressFill').style.width = progress + '%';
 }
 
 function setReady() {
   document.getElementById('shuffleBtn').disabled = false;
   document.getElementById('reloadBtn').disabled = false;
+  document.getElementById('progressBar').style.display = 'none';
+  document.getElementById('progressFill').style.width = '0%';
 }
 
 function showError(msg) {
@@ -209,39 +235,37 @@ function showError(msg) {
   setReady();
 }
 
-// 아직 안 쓴 키워드 중 랜덤 선택, 다 썼으면 초기화
-function pickKeyword() {
-  const remaining = KEYWORDS.filter(k => !usedKeywords.has(k));
-  if (remaining.length === 0) {
-    usedKeywords.clear();
-    return KEYWORDS[Math.floor(Math.random() * KEYWORDS.length)];
+// 키워드 순서대로 n개 가져오기 (pageToken 있으면 다음 페이지)
+function nextKeywords(n) {
+  const result = [];
+  for (let i = 0; i < n; i++) {
+    result.push(KEYWORDS[kwIndex % KEYWORDS.length]);
+    kwIndex++;
   }
-  const kw = remaining[Math.floor(Math.random() * remaining.length)];
-  usedKeywords.add(kw);
-  return kw;
+  return result;
 }
 
-async function fetchBatch(keyword, usePageToken) {
-  const tokenParam = (usePageToken && pageTokenMap[keyword]) ? `&pageToken=${pageTokenMap[keyword]}` : '';
+async function searchKeyword(kw) {
+  const tokenParam = pageTokenMap[kw] ? `&pageToken=${pageTokenMap[kw]}` : '';
   const url =
     'https://www.googleapis.com/youtube/v3/search' +
     '?part=snippet' +
-    '&q=' + encodeURIComponent(keyword) +
+    '&q=' + encodeURIComponent(kw) +
     '&type=video' +
-    '&maxResults=25' +
+    '&maxResults=50' +
     '&relevanceLanguage=ko' +
     '&regionCode=KR' +
     '&key=' + API_KEY +
     tokenParam;
-
   const res = await fetch(url);
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
-  if (data.nextPageToken) pageTokenMap[keyword] = data.nextPageToken;
+  if (data.nextPageToken) pageTokenMap[kw] = data.nextPageToken;
   return data.items.map(i => i.id.videoId);
 }
 
 async function fetchDetails(ids) {
+  if (ids.length === 0) return [];
   const res = await fetch(
     'https://www.googleapis.com/youtube/v3/videos' +
     '?part=contentDetails,snippet' +
@@ -258,19 +282,42 @@ async function fetchDetails(ids) {
   }).filter(Boolean);
 }
 
-// 처음 로드
+async function loadBatch(numKeywords, progressStart, progressEnd, loadingMsg) {
+  const kws = nextKeywords(numKeywords);
+  setBusy(loadingMsg, progressStart);
+
+  // 키워드 동시 검색
+  const idArrays = await Promise.all(kws.map(kw => searchKeyword(kw).catch(() => [])));
+  setBusy(loadingMsg, (progressStart + progressEnd) / 2);
+
+  // 중복 제거
+  const newIds = [...new Set(idArrays.flat())].filter(id => !seenIds.has(id));
+  newIds.forEach(id => seenIds.add(id));
+
+  if (newIds.length === 0) return 0;
+
+  // 상세정보 (50개씩 나눠서)
+  const chunks = [];
+  for (let i = 0; i < newIds.length; i += 50) chunks.push(newIds.slice(i, i+50));
+  const detailArrays = await Promise.all(chunks.map(chunk => fetchDetails(chunk).catch(() => [])));
+  const newVideos = detailArrays.flat();
+
+  allVideos = [...allVideos, ...newVideos];
+  setBusy(loadingMsg, progressEnd);
+  return newVideos.length;
+}
+
+// 처음 로드: 키워드 6개 동시에 쏴서 최대한 많이
 async function init() {
-  usedKeywords.clear();
-  pageTokenMap = {};
   allVideos = [];
-  setLoadingState('점핑다이어트 영상 검색 중...');
+  seenIds = new Set();
+  kwIndex = 0;
+  pageTokenMap = {};
+  document.getElementById('content').innerHTML = '<div class="loading"><div class="spinner"></div>점핑다이어트 영상 검색 중...</div>';
+  document.getElementById('countBar').textContent = '';
+
   try {
-    // 키워드 3개 동시 검색
-    const kws = [pickKeyword(), pickKeyword(), pickKeyword()];
-    const idArrays = await Promise.all(kws.map(kw => fetchBatch(kw, false)));
-    const ids = [...new Set(idArrays.flat())];
-    allVideos = await fetchDetails(ids);
-    allVideos.sort(() => Math.random() - 0.5);
+    await loadBatch(6, 10, 90, '영상 검색 중... (처음 로드)');
     setReady();
     renderGrid();
   } catch(e) {
@@ -278,21 +325,10 @@ async function init() {
   }
 }
 
-// 랜덤 섞기 = 새 키워드로 완전히 새 검색
+// 랜덤 섞기: 새 키워드 4개로 추가 검색 → 누적
 async function doShuffle() {
-  setLoadingState('새 영상 검색 중... 🔀');
   try {
-    // 안 쓴 키워드 2개로 새 검색
-    const kws = [pickKeyword(), pickKeyword()];
-    const idArrays = await Promise.all(kws.map(kw => fetchBatch(kw, true)));
-    const ids = [...new Set(idArrays.flat())];
-    const newVideos = await fetchDetails(ids);
-
-    // 기존과 합치고 중복 제거 후 다시 랜덤 정렬
-    const existingIds = new Set(allVideos.map(v => v.id));
-    const merged = [...allVideos, ...newVideos.filter(v => !existingIds.has(v.id))];
-    allVideos = merged.sort(() => Math.random() - 0.5);
-
+    await loadBatch(4, 10, 90, `새 영상 추가 검색 중... 🔀 (현재 ${allVideos.length}개)`);
     setReady();
     renderGrid();
   } catch(e) {
