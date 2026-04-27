@@ -106,6 +106,7 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #f2f2f2; }
 <script>
 const API_KEY = 'AIzaSyA-Wi7g_K24NWqqlAC-TjrbewPoto2CoBM';
 const KEYWORD = '점핑다이어트 영상';
+const JUMPING_KW = ['점핑', '트램폴린', 'jumping', 'trampoline'];
 
 const FILTERS = {
   'all':   { min: 0,  max: null },
@@ -135,6 +136,12 @@ function isoToStr(iso) {
   const h = parseInt(m[1]||0), mn = parseInt(m[2]||0), s = parseInt(m[3]||0);
   if (h > 0) return `${h}:${String(mn).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
   return `${mn}:${String(s).padStart(2,'0')}`;
+}
+
+function isJumping(item) {
+  const title = (item.snippet.title || '').toLowerCase();
+  const desc = (item.snippet.description || '').toLowerCase();
+  return JUMPING_KW.some(kw => title.includes(kw) || desc.includes(kw));
 }
 
 function applyFilter(videos) {
@@ -251,7 +258,12 @@ async function loadNextBatch(msg) {
   nextPageToken = data.nextPageToken || null;
 
   setBusy(msg, 60);
-  const ids = (data.items || []).map(i => i.id.videoId).filter(id => !seenIds.has(id));
+
+  // 점핑 관련 키워드 없는 영상 필터링
+  const ids = (data.items || [])
+    .filter(isJumping)
+    .map(i => i.id.videoId)
+    .filter(id => !seenIds.has(id));
   ids.forEach(id => seenIds.add(id));
 
   const chunks = [];
@@ -259,7 +271,7 @@ async function loadNextBatch(msg) {
   const newVideos = (await Promise.all(chunks.map(c => fetchDetails(c).catch(() => [])))).flat();
 
   allVideos = [...allVideos, ...newVideos];
-  displayedVideos = newVideos; // ← 화면은 이번 배치만 표시
+  displayedVideos = newVideos; // 화면은 이번 배치만 표시
 
   setBusy(msg, 90);
 }
