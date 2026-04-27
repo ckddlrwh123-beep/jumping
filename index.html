@@ -22,8 +22,9 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #f2f2f2; }
 .filter-btn.active { background: #FF0000; border-color: #FF0000; color: white; }
 
 .action-bar { display: flex; gap: 8px; padding: 12px 12px 4px; }
-.shuffle-btn { flex: 1; background: #FF0000; color: white; border: none; border-radius: 10px; padding: 11px; font-size: 14px; font-weight: 700; font-family: 'Noto Sans KR', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; transition: background 0.15s; }
+.shuffle-btn { flex: 1; background: #FF0000; color: white; border: none; border-radius: 10px; padding: 11px; font-size: 14px; font-weight: 700; font-family: 'Noto Sans KR', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; transition: all 0.15s; }
 .shuffle-btn:hover { background: #cc0000; }
+.shuffle-btn:disabled { background: #ffaaaa; cursor: not-allowed; }
 .reload-btn { background: white; color: #333; border: 1.5px solid #ddd; border-radius: 10px; padding: 11px 14px; font-size: 13px; font-family: 'Noto Sans KR', sans-serif; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 500; transition: all 0.15s; }
 .reload-btn:hover { border-color: #FF0000; color: #FF0000; }
 
@@ -50,9 +51,8 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #f2f2f2; }
 
 .error-box { margin: 20px 14px; background: white; border-radius: 12px; padding: 24px 20px; text-align: center; font-size: 13px; color: #666; line-height: 1.8; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
 .error-emoji { font-size: 32px; margin-bottom: 10px; }
-.error-msg { color: #999; font-size: 12px; margin-top: 6px; }
+.error-msg { color: #bbb; font-size: 11px; margin-top: 6px; }
 .retry-btn { margin-top: 16px; background: #FF0000; color: white; border: none; border-radius: 8px; padding: 10px 24px; font-size: 13px; font-family: 'Noto Sans KR', sans-serif; font-weight: 600; cursor: pointer; }
-
 .empty { text-align: center; padding: 50px 20px; color: #bbb; font-size: 13px; grid-column: 1/-1; }
 </style>
 </head>
@@ -74,21 +74,21 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #f2f2f2; }
   </div>
 
   <div class="action-bar">
-    <button class="shuffle-btn" onclick="shuffleVideos()">
+    <button class="shuffle-btn" id="shuffleBtn" onclick="fetchVideos(true)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
         <polyline points="16 3 21 3 21 8"/>
         <line x1="4" y1="20" x2="21" y2="3"/>
         <polyline points="21 16 21 21 16 21"/>
         <line x1="15" y1="15" x2="21" y2="21"/>
       </svg>
-      랜덤 섞기
+      랜덤 섞기 (새 검색)
     </button>
-    <button class="reload-btn" onclick="fetchVideos()">
+    <button class="reload-btn" onclick="fetchVideos(false)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
         <polyline points="23 4 23 10 17 10"/>
         <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
       </svg>
-      새로고침
+      처음부터
     </button>
   </div>
 
@@ -100,9 +100,20 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #f2f2f2; }
 
 <script>
 const API_KEY = 'AIzaSyA-Wi7g_K24NWqqlAC-TjrbewPoto2CoBM';
+
+// 다양한 키워드로 검색 → 영상 많이 확보
+const KEYWORDS = [
+  '점핑다이어트',
+  '점핑다이어트 홈트',
+  '점핑 유산소 운동',
+  '점핑다이어트 루틴',
+  '점핑 다이어트 전신',
+];
+
 let allVideos = [];
 let displayed = [];
 let currentFilter = 'all';
+let pageTokens = {}; // 키워드별 pageToken 저장 (다음 페이지 검색용)
 
 function isoToMins(iso) {
   const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
@@ -130,12 +141,7 @@ function setFilter(val) {
 
 function applyFilter() {
   const minMins = currentFilter === 'all' ? 0 : parseInt(currentFilter);
-  displayed = allVideos.filter(v => v.mins >= minMins);
-  renderGrid(displayed);
-}
-
-function shuffleVideos() {
-  displayed = [...displayed].sort(() => Math.random() - 0.5);
+  displayed = allVideos.filter(v => v.mins >= minMins).sort(() => Math.random() - 0.5);
   renderGrid(displayed);
 }
 
@@ -162,7 +168,6 @@ function renderGrid(list) {
       </div>
     </div>
   `).join('');
-
   document.getElementById('content').innerHTML = `<div class="grid">${html}</div>`;
 }
 
@@ -174,41 +179,67 @@ function showError(msg) {
       <div class="error-emoji">😢</div>
       <div>영상을 불러오지 못했어요.</div>
       <div class="error-msg">${msg}</div>
-      <button class="retry-btn" onclick="fetchVideos()">다시 시도</button>
+      <button class="retry-btn" onclick="fetchVideos(false)">다시 시도</button>
     </div>`;
+  document.getElementById('shuffleBtn').disabled = false;
 }
 
-async function fetchVideos() {
-  document.getElementById('content').innerHTML = '<div class="loading"><div class="spinner"></div>점핑다이어트 영상 검색 중...</div>';
-  document.getElementById('subtitle').textContent = '영상 불러오는 중...';
+function setLoading(msg) {
+  document.getElementById('content').innerHTML = `<div class="loading"><div class="spinner"></div>${msg}</div>`;
+  document.getElementById('subtitle').textContent = '검색 중...';
   document.getElementById('countBar').textContent = '';
+  document.getElementById('shuffleBtn').disabled = true;
+}
+
+// shuffle=true면 pageToken 써서 다음 페이지, false면 처음부터
+async function fetchVideos(shuffle) {
+  if (shuffle) {
+    setLoading('새 영상 검색 중... 🔀');
+  } else {
+    pageTokens = {};
+    setLoading('점핑다이어트 영상 검색 중...');
+  }
 
   try {
-    const searchRes = await fetch(
-      'https://www.googleapis.com/youtube/v3/search' +
-      '?part=snippet' +
-      '&q=점핑다이어트' +
-      '&type=video' +
-      '&maxResults=50' +
-      '&relevanceLanguage=ko' +
-      '&regionCode=KR' +
-      '&key=' + API_KEY
-    );
-    const searchData = await searchRes.json();
-    if (searchData.error) throw new Error(searchData.error.message);
+    // 키워드 랜덤 2개 선택
+    const picked = [...KEYWORDS].sort(() => Math.random() - 0.5).slice(0, 2);
 
-    const ids = searchData.items.map(i => i.id.videoId).join(',');
+    const searchPromises = picked.map(async (kw) => {
+      const tokenParam = (shuffle && pageTokens[kw]) ? `&pageToken=${pageTokens[kw]}` : '';
+      const url =
+        'https://www.googleapis.com/youtube/v3/search' +
+        '?part=snippet' +
+        '&q=' + encodeURIComponent(kw) +
+        '&type=video' +
+        '&maxResults=25' +
+        '&relevanceLanguage=ko' +
+        '&regionCode=KR' +
+        '&key=' + API_KEY +
+        tokenParam;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      // 다음 페이지 토큰 저장
+      if (data.nextPageToken) pageTokens[kw] = data.nextPageToken;
+      return data.items.map(i => i.id.videoId);
+    });
 
+    const idArrays = await Promise.all(searchPromises);
+    const ids = [...new Set(idArrays.flat())]; // 중복 제거
+
+    if (ids.length === 0) throw new Error('검색 결과가 없어요');
+
+    // 상세 정보 (재생시간)
     const detailRes = await fetch(
       'https://www.googleapis.com/youtube/v3/videos' +
       '?part=contentDetails,snippet' +
-      '&id=' + ids +
+      '&id=' + ids.join(',') +
       '&key=' + API_KEY
     );
     const detailData = await detailRes.json();
     if (detailData.error) throw new Error(detailData.error.message);
 
-    allVideos = detailData.items.map(v => {
+    const newVideos = detailData.items.map(v => {
       const iso = v.contentDetails.duration;
       const mins = isoToMins(iso);
       if (mins < 5) return null;
@@ -219,11 +250,12 @@ async function fetchVideos() {
         mins,
         durStr: isoToStr(iso),
       };
-    }).filter(Boolean).sort(() => Math.random() - 0.5);
+    }).filter(Boolean);
 
-    if (allVideos.length === 0) throw new Error('검색 결과가 없어요');
+    if (newVideos.length === 0) throw new Error('5분 이상 영상이 없어요');
 
-    displayed = [...allVideos];
+    allVideos = newVideos;
+    document.getElementById('shuffleBtn').disabled = false;
     applyFilter();
 
   } catch (e) {
@@ -231,7 +263,7 @@ async function fetchVideos() {
   }
 }
 
-fetchVideos();
+fetchVideos(false);
 </script>
 </body>
 </html>
